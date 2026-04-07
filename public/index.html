@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Crack the iPad</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .ipad-frame {
+    width: 100%;
+    max-width: 420px;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 900px;
+    background: #1c1c1e;
+    border-radius: 0;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  @media (min-width: 500px) {
+    .ipad-frame {
+      border-radius: 20px;
+      border: 2px solid #3a3a3c;
+      box-shadow: 0 0 0 1px #000, 0 40px 120px rgba(0,0,0,0.9), inset 0 0 0 1px rgba(255,255,255,0.05);
+      height: 900px;
+    }
+  }
+
+  /* Wallpaper */
+  .wallpaper {
+    position: absolute;
+    inset: 0;
+    background: url('earth.jpg') center/cover no-repeat;
+    z-index: 0;
+  }
+
+  .wallpaper::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+  }
+
+  /* Stars */
+  .stars { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+
+  .star {
+    position: absolute;
+    background: #fff;
+    border-radius: 50%;
+    animation: twinkle var(--dur, 3s) infinite ease-in-out var(--delay, 0s);
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: var(--min-op, 0.3); }
+    50% { opacity: 1; }
+  }
+
+  /* Live stats banner */
+  .live-stats {
+    position: relative;
+    z-index: 5;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 12px 16px 0;
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.3px;
+  }
+
+  .live-stats .stat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .live-stats .stat-value {
+    color: rgba(255,255,255,0.85);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    background: #ff453a;
+    border-radius: 50%;
+    animation: livePulse 1.5s infinite ease-in-out;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Time & Date */
+  .time-display {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    color: #fff;
+    margin-top: 40px;
+    margin-bottom: 8px;
+  }
+
+  .time {
+    font-size: 56px;
+    font-weight: 200;
+    letter-spacing: -3px;
+    line-height: 1;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  }
+
+  .date {
+    font-size: 17px;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+
+  /* Lock content */
+  .lock-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    flex: 1;
+  }
+
+  .passcode-label {
+    color: rgba(255,255,255,0.85);
+    font-size: 16px;
+    font-weight: 400;
+    margin: 8px 0 10px;
+  }
+
+  /* Dots */
+  .dots-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.85);
+    background: transparent;
+    transition: background 0.1s ease, transform 0.1s ease;
+  }
+
+  .dot.filled {
+    background: rgba(255,255,255,0.9);
+    transform: scale(1.05);
+  }
+
+  .dot.wrong {
+    border-color: #ff453a;
+    background: #ff453a;
+  }
+
+  .dots-row.shake { animation: shake 0.4s ease; }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+
+  .dot.correct {
+    border-color: #30d158;
+    background: #30d158;
+    animation: successPulse 0.6s ease forwards;
+  }
+
+  @keyframes successPulse {
+    0% { box-shadow: 0 0 0 0 rgba(48,209,88,0.6); }
+    70% { box-shadow: 0 0 0 15px rgba(48,209,88,0); }
+    100% { box-shadow: 0 0 0 0 rgba(48,209,88,0); }
+  }
+
+  /* Keypad */
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 250px;
+  }
+
+  .key {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.12s ease, transform 0.1s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .key:hover { background: rgba(255,255,255,0.26); }
+  .key:active, .key.pressed { background: rgba(255,255,255,0.38); transform: scale(0.93); }
+
+  .key-num { font-size: 30px; font-weight: 300; line-height: 1; }
+  .key-letters { font-size: 9px; font-weight: 500; letter-spacing: 1.5px; opacity: 0.6; margin-top: 2px; text-transform: uppercase; }
+
+  .key.delete-key { font-size: 20px; background: rgba(255,255,255,0.08); }
+  .key.delete-key:hover { background: rgba(255,255,255,0.18); }
+
+  /* Attempt info */
+  .attempt-info {
+    position: relative;
+    z-index: 2;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    margin-top: 16px;
+    text-align: center;
+    min-height: 20px;
+  }
+
+  .attempt-info .warn { color: #ff9f0a; font-weight: 500; }
+
+  /* Round banner */
+  .round-banner {
+    position: relative;
+    z-index: 3;
+    background: rgba(255,255,255,0.08);
+    padding: 4px 14px;
+    border-radius: 12px;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+  }
+
+  /* Disabled overlay */
+  .disabled-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: rgba(0,0,0,0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-align: center;
+    padding: 40px;
+    backdrop-filter: blur(8px);
+  }
+
+  .disabled-overlay.hidden { display: none; }
+
+  .disabled-icon { font-size: 50px; margin-bottom: 20px; }
+  .disabled-title { font-size: 26px; font-weight: 300; margin-bottom: 8px; }
+  .disabled-subtitle { font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 24px; }
+
+  .disabled-timer {
+    font-size: 48px;
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    color: #ff9f0a;
+  }
+
+  /* Winner overlay */
+  .winner-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-align: center;
+    padding: 40px;
+    backdrop-filter: blur(12px);
+  }
+
+  .winner-overlay.hidden { display: none; }
+  .winner-overlay.you-won { background: rgba(0,40,0,0.85); }
+
+  .winner-title { font-size: 32px; font-weight: 600; margin-bottom: 8px; }
+  .winner-subtitle { font-size: 17px; color: rgba(255,255,255,0.7); margin-bottom: 6px; }
+
+  .winner-code {
+    font-size: 56px;
+    font-weight: 200;
+    letter-spacing: 12px;
+    color: #30d158;
+    margin: 16px 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .winner-stats { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 8px; }
+  .winner-next { margin-top: 20px; font-size: 15px; color: #0a84ff; }
+
+  /* Home bar */
+  .home-bar {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 5px;
+    background: rgba(255,255,255,0.35);
+    border-radius: 3px;
+    z-index: 3;
+  }
+
+  /* Confetti */
+  .confetti-container { position: absolute; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; }
+  .confetti-container.hidden { display: none; }
+
+  .confetti {
+    position: absolute;
+    width: 8px; height: 8px;
+    top: -10px;
+    animation: confettiFall var(--fall-dur, 3s) ease-in forwards;
+    opacity: 0.9;
+  }
+
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="ipad-frame">
+  <div class="wallpaper"></div>
+  <div class="stars" id="stars"></div>
+
+  <!-- Live stats -->
+  <div class="live-stats">
+    <div class="stat"><div class="live-dot"></div> <span>LIVE</span></div>
+    <div class="stat"><span class="stat-value" id="statOnline">0</span> playing</div>
+    <div class="stat"><span class="stat-value" id="statLocked">0</span> locked out</div>
+    <div class="stat"><span class="stat-value" id="statGuesses">0</span> guesses</div>
+  </div>
+
+  <div class="time-display">
+    <div class="time" id="timeDisplay">9:41</div>
+    <div class="date" id="dateDisplay">Monday, April 7</div>
+  </div>
+
+  <div class="round-banner" id="roundBanner">ROUND 1</div>
+
+  <!-- Lock Content -->
+  <div class="lock-content">
+    <div class="passcode-label">Enter Passcode</div>
+
+    <div class="dots-row" id="dotsRow">
+      <div class="dot" id="d0"></div>
+      <div class="dot" id="d1"></div>
+      <div class="dot" id="d2"></div>
+      <div class="dot" id="d3"></div>
+    </div>
+
+    <div class="keypad">
+      <button class="key" data-num="1" onclick="pressKey('1')"><span class="key-num">1</span><span class="key-letters"></span></button>
+      <button class="key" data-num="2" onclick="pressKey('2')"><span class="key-num">2</span><span class="key-letters">ABC</span></button>
+      <button class="key" data-num="3" onclick="pressKey('3')"><span class="key-num">3</span><span class="key-letters">DEF</span></button>
+      <button class="key" data-num="4" onclick="pressKey('4')"><span class="key-num">4</span><span class="key-letters">GHI</span></button>
+      <button class="key" data-num="5" onclick="pressKey('5')"><span class="key-num">5</span><span class="key-letters">JKL</span></button>
+      <button class="key" data-num="6" onclick="pressKey('6')"><span class="key-num">6</span><span class="key-letters">MNO</span></button>
+      <button class="key" data-num="7" onclick="pressKey('7')"><span class="key-num">7</span><span class="key-letters">PQRS</span></button>
+      <button class="key" data-num="8" onclick="pressKey('8')"><span class="key-num">8</span><span class="key-letters">TUV</span></button>
+      <button class="key" data-num="9" onclick="pressKey('9')"><span class="key-num">9</span><span class="key-letters">WXYZ</span></button>
+      <button class="key" data-num="0" onclick="pressKey('0')" style="grid-column:2;"><span class="key-num">0</span><span class="key-letters"></span></button>
+      <button class="key delete-key" onclick="deleteKey()" style="grid-column:3;">&#9003;</button>
+    </div>
+
+    <div class="attempt-info" id="attemptInfo"></div>
+  </div>
+
+  <!-- Disabled overlay -->
+  <div class="disabled-overlay hidden" id="disabledOverlay">
+    <div class="disabled-icon">&#128274;</div>
+    <div class="disabled-title">iPad is Disabled</div>
+    <div class="disabled-subtitle">Try again in</div>
+    <div class="disabled-timer" id="disabledTimer">1:00</div>
+  </div>
+
+  <!-- Winner overlay -->
+  <div class="winner-overlay hidden" id="winnerOverlay">
+    <div class="winner-title" id="winnerTitle">Someone Cracked It!</div>
+    <div class="winner-subtitle">The passcode was</div>
+    <div class="winner-code" id="winnerCode">0000</div>
+    <div class="winner-stats" id="winnerStats"></div>
+    <div class="winner-next" id="winnerNext">Next round starting...</div>
+  </div>
+
+  <!-- Confetti -->
+  <div class="confetti-container hidden" id="confettiContainer"></div>
+
+  <div class="home-bar"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+
+let currentInput = '';
+let disabled = false;
+let disabledUntil = null;
+let disableInterval = null;
+let myAttempts = 0;
+let locked = false;
+
+// ── Clock ─────────────────────────────────────────────────────────────────────
+
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('timeDisplay').textContent = `${h > 12 ? h - 12 : h || 12}:${m}`;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('dateDisplay').textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+
+(function() {
+  const c = document.getElementById('stars');
+  for (let i = 0; i < 70; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 0.5;
+    s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*50}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s;--min-op:${0.1+Math.random()*0.4};`;
+    c.appendChild(s);
+  }
+})();
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function updateDots() {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('d' + i);
+    dot.className = 'dot' + (i < currentInput.length ? ' filled' : '');
+  }
+}
+
+function updateStats(stats) {
+  document.getElementById('statOnline').textContent = stats.online.toLocaleString();
+  document.getElementById('statLocked').textContent = stats.lockedOut.toLocaleString();
+  document.getElementById('statGuesses').textContent = stats.totalGuesses.toLocaleString();
+  document.getElementById('roundBanner').textContent = 'ROUND ' + stats.roundNumber;
+}
+
+function updateAttemptInfo() {
+  const el = document.getElementById('attemptInfo');
+  if (myAttempts === 0) { el.innerHTML = ''; return; }
+  if (myAttempts < 6) {
+    const left = 6 - myAttempts;
+    el.innerHTML = `${myAttempts} failed &mdash; <span class="warn">${left} more until lockout</span>`;
+  } else {
+    el.innerHTML = `<span class="warn">${myAttempts} failed attempts</span>`;
+  }
+}
+
+function formatTime(seconds) {
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function showDisabled(until) {
+  disabled = true;
+  disabledUntil = until;
+  const overlay = document.getElementById('disabledOverlay');
+  overlay.classList.remove('hidden');
+  function tick() {
+    const remaining = Math.max(0, Math.ceil((disabledUntil - Date.now()) / 1000));
+    document.getElementById('disabledTimer').textContent = formatTime(remaining);
+    if (remaining <= 0) {
+      disabled = false;
+      disabledUntil = null;
+      overlay.classList.add('hidden');
+      clearInterval(disableInterval);
+      disableInterval = null;
+    }
+  }
+  tick();
+  if (disableInterval) clearInterval(disableInterval);
+  disableInterval = setInterval(tick, 250);
+}
+
+function showWinner(isMe, code, totalGuesses) {
+  locked = true;
+  const overlay = document.getElementById('winnerOverlay');
+  overlay.classList.remove('hidden');
+  if (isMe) {
+    overlay.classList.add('you-won');
+    document.getElementById('winnerTitle').textContent = 'You Cracked It!';
+  } else {
+    overlay.classList.remove('you-won');
+    document.getElementById('winnerTitle').textContent = 'Someone Cracked It!';
+  }
+  if (code) document.getElementById('winnerCode').textContent = code;
+  document.getElementById('winnerStats').textContent = `Total guesses this round: ${totalGuesses.toLocaleString()}`;
+  if (isMe) spawnConfetti();
+  let countdown = 8;
+  document.getElementById('winnerNext').textContent = `Next round in ${countdown}s...`;
+  const ci = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) { clearInterval(ci); document.getElementById('winnerNext').textContent = 'Starting...'; }
+    else document.getElementById('winnerNext').textContent = `Next round in ${countdown}s...`;
+  }, 1000);
+}
+
+function spawnConfetti() {
+  const container = document.getElementById('confettiContainer');
+  container.classList.remove('hidden');
+  container.innerHTML = '';
+  const colors = ['#ff453a','#30d158','#0a84ff','#ff9f0a','#bf5af2','#ffd60a','#64d2ff'];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const size = 5 + Math.random() * 8;
+    c.style.cssText = `left:${Math.random()*100}%;width:${size}px;height:${size}px;background:${color};border-radius:${Math.random()>0.5?'50%':'2px'};--fall-dur:${2+Math.random()*2}s;animation-delay:${Math.random()*0.8}s;`;
+    container.appendChild(c);
+  }
+  setTimeout(() => { container.classList.add('hidden'); container.innerHTML = ''; }, 5000);
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+
+function pressKey(num) {
+  if (disabled || locked) return;
+  if (currentInput.length >= 4) return;
+  const btn = document.querySelector(`[data-num="${num}"]`);
+  if (btn) { btn.classList.add('pressed'); setTimeout(() => btn.classList.remove('pressed'), 120); }
+  currentInput += num;
+  updateDots();
+  if (currentInput.length === 4) {
+    setTimeout(() => { socket.emit('guess', currentInput); }, 120);
+  }
+}
+
+function deleteKey() {
+  if (disabled || locked) return;
+  currentInput = currentInput.slice(0, -1);
+  updateDots();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key >= '0' && e.key <= '9') pressKey(e.key);
+  if (e.key === 'Backspace' || e.key === 'Delete') deleteKey();
+});
+
+// ── Socket events ─────────────────────────────────────────────────────────────
+
+socket.on('init', (data) => {
+  myAttempts = data.playerState.attempts;
+  updateStats(data.stats);
+  updateAttemptInfo();
+  if (data.playerState.disabledUntil && data.playerState.disabledUntil > Date.now()) {
+    showDisabled(data.playerState.disabledUntil);
+  }
+});
+
+socket.on('stats', (stats) => { updateStats(stats); });
+
+socket.on('wrong', (data) => {
+  myAttempts = data.attempts;
+  const row = document.getElementById('dotsRow');
+  for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'dot wrong';
+  row.classList.add('shake');
+  setTimeout(() => {
+    row.classList.remove('shake');
+    currentInput = '';
+    for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'dot';
+    updateAttemptInfo();
+    if (data.disabledUntil && data.disabledUntil > Date.now()) showDisabled(data.disabledUntil);
+  }, 500);
+});
+
+socket.on('correct', (data) => {
+  for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'dot correct';
+});
+
+socket.on('disabled', (data) => {
+  currentInput = '';
+  updateDots();
+  if (data.until > Date.now()) showDisabled(data.until);
+});
+
+socket.on('round_won', (data) => {
+  const isMe = document.querySelector('.dot.correct') !== null;
+  showWinner(isMe, null, data.totalGuesses);
+  if (data.stats) updateStats(data.stats);
+});
+
+socket.on('new_round', (data) => {
+  locked = false;
+  disabled = false;
+  disabledUntil = null;
+  currentInput = '';
+  myAttempts = data.playerState.attempts;
+  document.getElementById('winnerOverlay').classList.add('hidden');
+  document.getElementById('winnerOverlay').classList.remove('you-won');
+  document.getElementById('disabledOverlay').classList.add('hidden');
+  document.getElementById('confettiContainer').classList.add('hidden');
+  if (disableInterval) { clearInterval(disableInterval); disableInterval = null; }
+  updateDots();
+  updateStats(data.stats);
+  updateAttemptInfo();
+});
+</script>
+</body>
+</html>
