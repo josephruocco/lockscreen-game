@@ -48,12 +48,18 @@ async function moderateName(name) {
   if (!OPENAI_API_KEY) return { ok: true };
 
   const normalized = normalizeText(name);
+  const prompt = `Is the following player display name offensive, a slur, or hate speech — including deliberate misspellings or phonetic substitutions? Reply with only "yes" or "no".\n\nName: "${name}"\nNormalized: "${normalized}"`;
 
   return new Promise((resolve) => {
-    const body = JSON.stringify({ input: [name, normalized] });
+    const body = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 3,
+      temperature: 0,
+    });
     const options = {
       hostname: 'api.openai.com',
-      path: '/v1/moderations',
+      path: '/v1/chat/completions',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,8 +74,8 @@ async function moderateName(name) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          const flagged = json.results?.some(r => r.flagged);
-          if (flagged) {
+          const reply = json.choices?.[0]?.message?.content?.trim().toLowerCase() || '';
+          if (reply.startsWith('yes')) {
             resolve({ ok: false, reason: 'Name not allowed.' });
           } else {
             resolve({ ok: true });
@@ -81,7 +87,7 @@ async function moderateName(name) {
     });
 
     req.on('error', () => resolve({ ok: true }));
-    req.setTimeout(3000, () => { req.destroy(); resolve({ ok: true }); });
+    req.setTimeout(5000, () => { req.destroy(); resolve({ ok: true }); });
     req.write(body);
     req.end();
   });
@@ -114,7 +120,7 @@ function getDisableSeconds(attempts) {
 
 function getPlayerState(socketId) {
   if (!players.has(socketId)) {
-    players.set(socketId, { attempts: 0, disabledUntil: null, name: null });
+    players.set(socketId, { attempts: 0, disabledUntil: null, name: null, guessed: new Set() });
   }
   return players.get(socketId);
 }
@@ -162,6 +168,7 @@ function startNewRound() {
   for (const [, p] of players) {
     p.attempts = 0;
     p.disabledUntil = null;
+    p.guessed = new Set();
   }
   console.log(`Round ${round.number} — password: ${round.password}`);
 }
@@ -229,6 +236,12 @@ io.on('connection', (socket) => {
       player.disabledUntil = null;
     }
 
+    if (player.guessed.has(code)) {
+      socket.emit('wrong', { attempts: player.attempts, disabledUntil: player.disabledUntil, duplicate: true });
+      return;
+    }
+
+    player.guessed.add(code);
     round.totalGuesses++;
     player.attempts++;
 
