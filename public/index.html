@@ -912,6 +912,7 @@ let locked = false;
 let myName = null;
 let myWon = false;
 let playersPanelOpen = false;
+let lastCorrect = null;
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 
@@ -1011,11 +1012,18 @@ function updateStats(stats) {
 function updateAttemptInfo() {
   const el = document.getElementById('attemptInfo');
   if (myAttempts === 0) { el.innerHTML = ''; return; }
+  let hint = '';
+  if (lastCorrect !== null) {
+    if (lastCorrect === 0) hint = '0 digits correct';
+    else if (lastCorrect === 1) hint = '1 digit correct';
+    else if (lastCorrect === 2) hint = '2 digits correct';
+    else if (lastCorrect === 3) hint = '<span style="color:#ffd60a">3 digits correct!</span>';
+  }
   if (myAttempts < 6) {
     const left = 6 - myAttempts;
-    el.innerHTML = `<span class="warn">${t('failedOne', { n: myAttempts, left })}</span>`;
+    el.innerHTML = `${hint ? hint + ' &mdash; ' : ''}<span class="warn">${left} left before lockout</span>`;
   } else {
-    el.innerHTML = `<span class="warn">${t('failedMany', { n: myAttempts })}</span>`;
+    el.innerHTML = hint || `<span class="warn">${myAttempts} failed attempts</span>`;
   }
 }
 
@@ -1152,6 +1160,7 @@ socket.on('name_rejected', (data) => {
 
 socket.on('wrong', (data) => {
   myAttempts = data.attempts;
+  if (typeof data.correct === 'number') lastCorrect = data.correct;
   const row = document.getElementById('dotsRow');
   for (let i = 0; i < 4; i++) document.getElementById('d' + i).className = 'dot wrong';
   row.classList.add('shake');

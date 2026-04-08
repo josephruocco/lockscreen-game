@@ -265,7 +265,11 @@ io.on('connection', (socket) => {
       if (disableSeconds > 0) {
         player.disabledUntil = now + disableSeconds * 1000;
       }
-      socket.emit('wrong', { attempts: player.attempts, disabledUntil: player.disabledUntil });
+      let correct = 0;
+      for (let i = 0; i < 4; i++) {
+        if (code[i] === round.password[i]) correct++;
+      }
+      socket.emit('wrong', { attempts: player.attempts, disabledUntil: player.disabledUntil, correct });
     }
 
     io.emit('stats', getStats());
