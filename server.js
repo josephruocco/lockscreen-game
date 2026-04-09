@@ -143,11 +143,14 @@ function getPlayerList() {
 }
 
 function getStats() {
-  const online = io.engine.clientsCount;
+  let online = 0;
   let lockedOut = 0;
   const now = Date.now();
   for (const [, p] of players) {
-    if (p.socketId && p.disabledUntil && p.disabledUntil > now) lockedOut++;
+    if (p.socketId) {
+      online++;
+      if (p.disabledUntil && p.disabledUntil > now) lockedOut++;
+    }
   }
   return {
     online,
