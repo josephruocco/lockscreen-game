@@ -252,6 +252,7 @@ io.on('connection', (socket) => {
         roundNumber: round.number,
         totalGuesses: round.totalGuesses,
         winnerName: player.name,
+        password: round.password,
         stats: getStats(),
       });
 

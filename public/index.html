@@ -669,6 +669,19 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// ── Prevent multiple tabs ────────────────────────────────────────────────────
+const tabChannel = new BroadcastChannel('lockscreen_game');
+const tabId = Date.now() + '-' + Math.random();
+tabChannel.postMessage({ type: 'new_tab', id: tabId });
+tabChannel.onmessage = (e) => {
+  if (e.data.type === 'new_tab' && e.data.id !== tabId) {
+    tabChannel.postMessage({ type: 'already_open', id: tabId });
+  }
+  if (e.data.type === 'already_open' && e.data.id !== tabId) {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:system-ui;font-size:20px;text-align:center;padding:20px;">Game is already open in another tab. Please close this one.</div>';
+  }
+};
+
 const socket = io();
 
 // ── i18n ──────────────────────────────────────────────────────────────────────
@@ -964,6 +977,13 @@ updateClock();
 
 // ── Name entry ────────────────────────────────────────────────────────────────
 
+(function autoRestoreName() {
+  const saved = localStorage.getItem('playerName');
+  if (saved) {
+    socket.emit('set_name', saved);
+  }
+})();
+
 function submitName() {
   const input = document.getElementById('nameInput');
   const raw = input.value.trim();
@@ -1170,6 +1190,7 @@ socket.on('players', (list) => { renderPlayers(list); });
 
 socket.on('name_accepted', (data) => {
   myName = data.name;
+  localStorage.setItem('playerName', data.name);
   document.getElementById('nameOverlay').classList.add('hidden');
 });
 
@@ -1205,7 +1226,7 @@ socket.on('disabled', (data) => {
 });
 
 socket.on('round_won', (data) => {
-  showWinner(myWon, data.winnerName, null, data.totalGuesses);
+  showWinner(myWon, data.winnerName, data.password, data.totalGuesses);
   myWon = false;
   if (data.stats) updateStats(data.stats);
 });
