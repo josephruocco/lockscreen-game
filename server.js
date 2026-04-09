@@ -174,17 +174,14 @@ function startNewRound() {
 }
 
 function broadcastNewRound() {
-  for (const [id] of players) {
-    const sock = io.sockets.sockets.get(id);
-    if (sock) {
-      const ps = getPlayerState(id);
-      sock.emit('new_round', {
-        stats: getStats(),
-        playerState: { attempts: ps.attempts, disabledUntil: ps.disabledUntil },
-        roundNumber: round.number,
-        players: getPlayerList(),
-      });
-    }
+  for (const [id, sock] of io.sockets.sockets) {
+    const ps = getPlayerState(id);
+    sock.emit('new_round', {
+      stats: getStats(),
+      playerState: { attempts: ps.attempts, disabledUntil: ps.disabledUntil },
+      roundNumber: round.number,
+      players: getPlayerList(),
+    });
   }
 }
 

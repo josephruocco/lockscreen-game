@@ -1236,6 +1236,7 @@ socket.on('new_round', (data) => {
   disabled = false;
   disabledUntil = null;
   currentInput = '';
+  lastCorrect = null;
   myAttempts = data.playerState.attempts;
   document.getElementById('winnerOverlay').classList.add('hidden');
   document.getElementById('winnerOverlay').classList.remove('you-won');
