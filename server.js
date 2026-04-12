@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const https = require('https');
+const db = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,10 +16,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const DISABLE_SCHEDULE = [
-  { after: 6,  seconds: 60 },
-  { after: 7,  seconds: 300 },
-  { after: 8,  seconds: 900 },
-  { after: 9,  seconds: 3600 },
+  { after: 6, seconds: 60 },
+  { after: 7, seconds: 300 },
+  { after: 8, seconds: 900 },
+  { after: 9, seconds: 3600 },
   { after: 10, seconds: 7200 },
   { after: 11, seconds: 14400 },
 ];
@@ -63,7 +64,7 @@ async function moderateName(name) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         'Content-Length': Buffer.byteLength(body),
       },
     };
@@ -103,7 +104,9 @@ let round = {
   totalGuesses: 0,
 };
 
-const players = new Map();      // keyed by persistent playerId
+db.initRound(round);
+
+const players = new Map(); // keyed by persistent playerId
 const socketToPlayer = new Map(); // socketId -> playerId
 
 function generatePassword() {
@@ -121,7 +124,13 @@ function getDisableSeconds(attempts) {
 
 function getPlayerState(playerId) {
   if (!players.has(playerId)) {
-    players.set(playerId, { attempts: 0, disabledUntil: null, name: null, guessed: new Set(), socketId: null });
+    players.set(playerId, {
+      attempts: 0,
+      disabledUntil: null,
+      name: null,
+      guessed: new Set(),
+      socketId: null,
+    });
   }
   return players.get(playerId);
 }
@@ -169,6 +178,7 @@ function startNewRound() {
     winner: null,
     totalGuesses: 0,
   };
+  db.initRound(round);
   for (const [, p] of players) {
     p.attempts = 0;
     p.disabledUntil = null;
@@ -190,6 +200,53 @@ function broadcastNewRound() {
   }
 }
 
+// ── Admin Auth ────────────────────────────────────────────────────────────────
+
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'changeme';
+
+function requireAdmin(req, res, next) {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// ── Stats API (auth required) ────────────────────────────────────────────────
+
+app.get('/admin.html', requireAdmin, (_req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/api/stats/overview', requireAdmin, (_req, res) => {
+  res.json({ live: getStats(), historical: db.getOverview() });
+});
+
+app.get('/api/stats/leaderboard/winners', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  res.json(db.getLeaderboardWinners(limit));
+});
+
+app.get('/api/stats/leaderboard/crackers', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  res.json(db.getLeaderboardCrackers(limit));
+});
+
+app.get('/api/stats/leaderboard/lockouts', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  res.json(db.getLeaderboardLockouts(limit));
+});
+
+app.get('/api/stats/players', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  res.json(db.getPlayerStats(limit));
+});
+
+app.get('/api/stats/recent-rounds', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 25, 200);
+  res.json(db.getRecentRounds(limit));
+});
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 
 io.on('connection', (socket) => {
@@ -200,7 +257,6 @@ io.on('connection', (socket) => {
     if (typeof pid !== 'string' || pid.length < 8 || pid.length > 64) return;
     playerId = pid;
 
-    // Clean up old socket mapping if this player was already connected
     const oldSocketId = players.get(playerId)?.socketId;
     if (oldSocketId && oldSocketId !== socket.id) {
       socketToPlayer.delete(oldSocketId);
@@ -209,6 +265,7 @@ io.on('connection', (socket) => {
     player = getPlayerState(playerId);
     player.socketId = socket.id;
     socketToPlayer.set(socket.id, playerId);
+    db.touchPlayer(playerId, player.name);
 
     socket.emit('init', {
       stats: getStats(),
@@ -217,7 +274,6 @@ io.on('connection', (socket) => {
       players: getPlayerList(),
     });
 
-    // If player had a name, auto-accept it
     if (player.name) {
       socket.emit('name_accepted', { name: player.name });
     }
@@ -240,6 +296,7 @@ io.on('connection', (socket) => {
       return;
     }
     player.name = name;
+    db.setPlayerName(playerId, name);
     socket.emit('name_accepted', { name });
     io.emit('players', getPlayerList());
   });
@@ -270,8 +327,31 @@ io.on('connection', (socket) => {
     round.totalGuesses++;
     player.attempts++;
 
-    if (code === round.password) {
+    let correct = 0;
+    for (let i = 0; i < 4; i++) {
+      if (code[i] === round.password[i]) correct++;
+    }
+
+    const isCorrect = code === round.password;
+
+    db.recordGuess({
+      roundNumber: round.number,
+      playerId,
+      playerName: player.name,
+      isCorrect,
+      correctDigits: correct,
+      guessedAt: now,
+      totalGuesses: round.totalGuesses,
+    });
+
+    if (isCorrect) {
       round.winner = playerId;
+      db.finishRound({
+        roundNumber: round.number,
+        winnerPlayerId: playerId,
+        endedAt: now,
+        totalGuesses: round.totalGuesses,
+      });
       socket.emit('correct', { password: round.password });
       io.emit('round_won', {
         roundNumber: round.number,
@@ -285,15 +365,19 @@ io.on('connection', (socket) => {
         startNewRound();
         broadcastNewRound();
       }, 8000);
-
     } else {
       const disableSeconds = getDisableSeconds(player.attempts);
       if (disableSeconds > 0) {
         player.disabledUntil = now + disableSeconds * 1000;
-      }
-      let correct = 0;
-      for (let i = 0; i < 4; i++) {
-        if (code[i] === round.password[i]) correct++;
+        db.recordLockout({
+          roundNumber: round.number,
+          playerId,
+          playerName: player.name,
+          attemptCountTrigger: player.attempts,
+          startedAt: now,
+          endedAt: player.disabledUntil,
+          durationSeconds: disableSeconds,
+        });
       }
       socket.emit('wrong', { attempts: player.attempts, disabledUntil: player.disabledUntil, correct });
     }

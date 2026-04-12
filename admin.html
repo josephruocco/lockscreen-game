@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lockscreen Game Admin</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121935;
+    --panel-2: #192246;
+    --text: #eef2ff;
+    --muted: #a8b1d1;
+    --accent: #7c9cff;
+    --accent-2: #37d39a;
+    --danger: #ff6d7a;
+    --warn: #ffc857;
+    --border: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(180deg, #090d1a 0%, var(--bg) 100%);
+    color: var(--text);
+  }
+  .wrap { max-width: 1300px; margin: 0 auto; padding: 24px; }
+  .topbar { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .title h1 { margin: 0; font-size: 32px; }
+  .title p { margin: 6px 0 0; color: var(--muted); }
+  .pill { background: rgba(124,156,255,0.12); color: #c9d5ff; border: 1px solid rgba(124,156,255,0.25); border-radius: 999px; padding: 8px 12px; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  }
+  .stat-card { grid-column: span 3; }
+  .stat-label { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .stat-value { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat-sub { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .section-title h2 { margin: 0; font-size: 20px; }
+  .section-title .sub { color: var(--muted); font-size: 13px; }
+  .wide { grid-column: span 8; }
+  .side { grid-column: span 4; }
+  .full { grid-column: 1 / -1; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; font-size: 14px; }
+  th { color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+  .rank { color: var(--muted); width: 52px; }
+  .mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .winner { color: var(--accent-2); font-weight: 600; }
+  .danger { color: var(--danger); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .feed { display: grid; gap: 10px; }
+  .feed-item { padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.04); }
+  .feed-item strong { color: var(--accent-2); }
+  .toolbar { display: flex; gap: 10px; align-items: center; }
+  .toolbar button {
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .toolbar button:hover { background: rgba(255,255,255,0.08); }
+  @media (max-width: 980px) {
+    .stat-card, .wide, .side { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        <h1>Lockscreen Game Dashboard</h1>
+        <p>Internal stats, leaderboard tracking, and round history.</p>
+      </div>
+      <div class="toolbar">
+        <div class="pill" id="lastUpdated">Loading…</div>
+        <button onclick="loadAll()">Refresh</button>
+      </div>
+    </div>
+
+    <div class="grid" id="statsGrid">
+      <div class="card stat-card"><div class="stat-label">Live players</div><div class="stat-value mono" id="livePlayers">—</div><div class="stat-sub" id="livePlayersSub">Currently online</div></div>
+      <div class="card stat-card"><div class="stat-label">Active lockouts</div><div class="stat-value mono" id="liveLockouts">—</div><div class="stat-sub">Players locked out right now</div></div>
+      <div class="card stat-card"><div class="stat-label">Total rounds</div><div class="stat-value mono" id="totalRounds">—</div><div class="stat-sub" id="avgRoundSub">Average round time —</div></div>
+      <div class="card stat-card"><div class="stat-label">Total guesses</div><div class="stat-value mono" id="totalGuesses">—</div><div class="stat-sub" id="currentRoundSub">Current round guesses —</div></div>
+      <div class="card stat-card"><div class="stat-label">Passwords cracked</div><div class="stat-value mono" id="totalCracks">—</div><div class="stat-sub">Historical successful solves</div></div>
+      <div class="card stat-card"><div class="stat-label">Total players</div><div class="stat-value mono" id="totalPlayers">—</div><div class="stat-sub">Known unique player IDs</div></div>
+      <div class="card stat-card"><div class="stat-label">Lockout events</div><div class="stat-value mono" id="totalLockouts">—</div><div class="stat-sub">Historical lockouts</div></div>
+      <div class="card stat-card"><div class="stat-label">Total lockout time</div><div class="stat-value mono" id="totalLockoutTime">—</div><div class="stat-sub">Absolute time players spent locked out</div></div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Leaderboard: Round Winners</h2>
+          <div class="sub">Most round wins, fastest wins as tiebreaker</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th class="rank">#</th><th>Player</th><th>Rounds won</th><th>Avg win time</th><th>Fastest win</th><th>Last win</th></tr>
+          </thead>
+          <tbody id="winnersTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card side">
+        <div class="section-title">
+          <h2>Recent Winners</h2>
+          <div class="sub">Latest cracked rounds</div>
+        </div>
+        <div class="feed" id="recentWinners"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Leaderboard: Password Crackers</h2>
+          <div class="sub">Most passwords cracked, then best crack rate</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th class="rank">#</th><th>Player</th><th>Passwords cracked</th><th>Total guesses</th><th>Crack rate</th><th>Avg crack time</th><th>Fastest crack</th></tr>
+          </thead>
+          <tbody id="crackersTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card side">
+        <div class="section-title">
+          <h2>Leaderboard: Most Time Locked Out</h2>
+          <div class="sub">The cursed board</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th class="rank">#</th><th>Player</th><th>Total time</th><th>Count</th><th>Longest</th></tr>
+          </thead>
+          <tbody id="lockoutsTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card full">
+        <div class="section-title">
+          <h2>Recent Rounds</h2>
+          <div class="sub">Winner, duration, and guess volume</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Round</th><th>Winner</th><th>Started</th><th>Ended</th><th>Duration</th><th>Total guesses</th></tr>
+          </thead>
+          <tbody id="roundsTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card full">
+        <div class="section-title">
+          <h2>Player Stats</h2>
+          <div class="sub">All tracked players across guesses, wins, and lockouts</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Player</th><th>Wins</th><th>Passwords cracked</th><th>Total guesses</th><th>Lockouts</th><th>Total lockout time</th><th>Longest lockout</th><th>Last seen</th></tr>
+          </thead>
+          <tbody id="playersTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+  function fmtNumber(v) {
+    return Number(v || 0).toLocaleString();
+  }
+  function fmtSeconds(totalSeconds) {
+    const seconds = Number(totalSeconds || 0);
+    if (!seconds) return '0s';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h) return `${h}h ${m}m ${s}s`;
+    if (m) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleString();
+  }
+  function rowHtml(cells) {
+    return `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`;
+  }
+  const token = new URLSearchParams(window.location.search).get('token');
+  async function getJson(url) {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed: ${url}`);
+    return res.json();
+  }
+
+  async function loadAll() {
+    const [overview, winners, crackers, lockouts, rounds, players] = await Promise.all([
+      getJson('/api/stats/overview'),
+      getJson('/api/stats/leaderboard/winners'),
+      getJson('/api/stats/leaderboard/crackers'),
+      getJson('/api/stats/leaderboard/lockouts'),
+      getJson('/api/stats/recent-rounds'),
+      getJson('/api/stats/players'),
+    ]);
+
+    document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+    document.getElementById('livePlayers').textContent = fmtNumber(overview.live.online);
+    document.getElementById('liveLockouts').textContent = fmtNumber(overview.live.lockedOut);
+    document.getElementById('totalRounds').textContent = fmtNumber(overview.historical.totalRounds);
+    document.getElementById('totalGuesses').textContent = fmtNumber(overview.historical.totalGuesses);
+    document.getElementById('totalCracks').textContent = fmtNumber(overview.historical.totalCracks);
+    document.getElementById('totalPlayers').textContent = fmtNumber(overview.historical.totalPlayers);
+    document.getElementById('totalLockouts').textContent = fmtNumber(overview.historical.totalLockouts);
+    document.getElementById('totalLockoutTime').textContent = fmtSeconds(overview.historical.totalLockoutSeconds);
+    document.getElementById('avgRoundSub').textContent = `Average round time ${fmtSeconds(overview.historical.avgRoundSeconds)}`;
+    document.getElementById('currentRoundSub').textContent = `Current round guesses ${fmtNumber(overview.live.totalGuesses)}`;
+
+    document.getElementById('winnersTable').innerHTML = winners.map((row, i) => rowHtml([
+      `<span class="rank mono">${i + 1}</span>`,
+      `<span class="winner">${row.playerName}</span>`,
+      `<span class="mono">${fmtNumber(row.roundsWon)}</span>`,
+      `<span class="mono">${fmtSeconds(row.avgWinSeconds)}</span>`,
+      `<span class="mono">${fmtSeconds(row.fastestWinSeconds)}</span>`,
+      `<span class="mono muted">${fmtDate(row.lastWinAt)}</span>`,
+    ])).join('') || rowHtml(['—','No wins yet','—','—','—','—']);
+
+    document.getElementById('crackersTable').innerHTML = crackers.map((row, i) => rowHtml([
+      `<span class="rank mono">${i + 1}</span>`,
+      `<span class="winner">${row.playerName}</span>`,
+      `<span class="mono">${fmtNumber(row.passwordsCracked)}</span>`,
+      `<span class="mono">${fmtNumber(row.totalGuesses)}</span>`,
+      `<span class="mono">${row.crackRate}%</span>`,
+      `<span class="mono">${fmtSeconds(row.avgCrackSeconds)}</span>`,
+      `<span class="mono">${fmtSeconds(row.fastestCrackSeconds)}</span>`,
+    ])).join('') || rowHtml(['—','No cracks yet','—','—','—','—','—']);
+
+    document.getElementById('lockoutsTable').innerHTML = lockouts.map((row, i) => rowHtml([
+      `<span class="rank mono">${i + 1}</span>`,
+      `<span class="danger">${row.playerName}</span>`,
+      `<span class="mono">${fmtSeconds(row.totalLockoutSeconds)}</span>`,
+      `<span class="mono">${fmtNumber(row.lockoutCount)}</span>`,
+      `<span class="mono">${fmtSeconds(row.longestLockoutSeconds)}</span>`,
+    ])).join('') || rowHtml(['—','No lockouts yet','—','—','—']);
+
+    document.getElementById('roundsTable').innerHTML = rounds.map((row) => rowHtml([
+      `<span class="mono">#${row.roundNumber}</span>`,
+      `<span class="winner">${row.winnerName || '—'}</span>`,
+      `<span class="mono muted">${fmtDate(row.startedAt)}</span>`,
+      `<span class="mono muted">${fmtDate(row.endedAt)}</span>`,
+      `<span class="mono">${fmtSeconds(row.durationSeconds)}</span>`,
+      `<span class="mono">${fmtNumber(row.totalGuesses)}</span>`,
+    ])).join('') || rowHtml(['—','No completed rounds yet','—','—','—','—']);
+
+    document.getElementById('playersTable').innerHTML = players.map((row) => rowHtml([
+      `<span class="winner">${row.playerName}</span>`,
+      `<span class="mono">${fmtNumber(row.roundsWon)}</span>`,
+      `<span class="mono">${fmtNumber(row.passwordsCracked)}</span>`,
+      `<span class="mono">${fmtNumber(row.totalGuesses)}</span>`,
+      `<span class="mono">${fmtNumber(row.lockoutCount)}</span>`,
+      `<span class="mono">${fmtSeconds(row.totalLockoutSeconds)}</span>`,
+      `<span class="mono">${fmtSeconds(row.longestLockoutSeconds)}</span>`,
+      `<span class="mono muted">${fmtDate(row.lastSeenAt)}</span>`,
+    ])).join('') || rowHtml(['No players yet','—','—','—','—','—','—','—']);
+
+    document.getElementById('recentWinners').innerHTML = (overview.historical.recentWinners || []).map((item) => `
+      <div class="feed-item">
+        <div><strong>${item.winner_name}</strong> won round <span class="mono">#${item.round_number}</span></div>
+        <div class="muted mono">${fmtNumber(item.total_guesses)} guesses • ${fmtSeconds(item.ended_at && item.started_at ? (item.ended_at - item.started_at) / 1000 : 0)}</div>
+      </div>
+    `).join('') || '<div class="feed-item muted">No winners yet.</div>';
+  }
+
+  loadAll();
+  setInterval(loadAll, 15000);
+</script>
+</body>
+</html>
