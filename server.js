@@ -104,8 +104,6 @@ let round = {
   totalGuesses: 0,
 };
 
-db.initRound(round);
-
 const players = new Map(); // keyed by persistent playerId
 const socketToPlayer = new Map(); // socketId -> playerId
 
@@ -399,7 +397,14 @@ io.on('connection', (socket) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Lockscreen Game running on http://localhost:${PORT}`);
-  console.log(`Round ${round.number} — password: ${round.password}`);
+
+db.init().then(() => {
+  db.initRound(round);
+  server.listen(PORT, () => {
+    console.log(`Lockscreen Game running on http://localhost:${PORT}`);
+    console.log(`Round ${round.number} — password: ${round.password}`);
+  });
+}).catch((err) => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });
