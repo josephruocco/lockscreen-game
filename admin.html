@@ -193,8 +193,10 @@
   function rowHtml(cells) {
     return `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`;
   }
+  const token = new URLSearchParams(window.location.search).get('token');
   async function getJson(url) {
-    const res = await fetch(url, { cache: 'no-store' });
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}token=${encodeURIComponent(token)}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed: ${url}`);
     return res.json();
   }

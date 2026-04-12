@@ -200,33 +200,49 @@ function broadcastNewRound() {
   }
 }
 
-// ── Stats API ─────────────────────────────────────────────────────────────────
+// ── Admin Auth ────────────────────────────────────────────────────────────────
 
-app.get('/api/stats/overview', (_req, res) => {
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'changeme';
+
+function requireAdmin(req, res, next) {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// ── Stats API (auth required) ────────────────────────────────────────────────
+
+app.get('/admin.html', requireAdmin, (_req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/api/stats/overview', requireAdmin, (_req, res) => {
   res.json({ live: getStats(), historical: db.getOverview() });
 });
 
-app.get('/api/stats/leaderboard/winners', (req, res) => {
+app.get('/api/stats/leaderboard/winners', requireAdmin, (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   res.json(db.getLeaderboardWinners(limit));
 });
 
-app.get('/api/stats/leaderboard/crackers', (req, res) => {
+app.get('/api/stats/leaderboard/crackers', requireAdmin, (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   res.json(db.getLeaderboardCrackers(limit));
 });
 
-app.get('/api/stats/leaderboard/lockouts', (req, res) => {
+app.get('/api/stats/leaderboard/lockouts', requireAdmin, (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   res.json(db.getLeaderboardLockouts(limit));
 });
 
-app.get('/api/stats/players', (req, res) => {
+app.get('/api/stats/players', requireAdmin, (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   res.json(db.getPlayerStats(limit));
 });
 
-app.get('/api/stats/recent-rounds', (req, res) => {
+app.get('/api/stats/recent-rounds', requireAdmin, (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 25, 200);
   res.json(db.getRecentRounds(limit));
 });
@@ -280,7 +296,6 @@ io.on('connection', (socket) => {
       return;
     }
     player.name = name;
-    db.touchPlayer(playerId, name);
     db.setPlayerName(playerId, name);
     socket.emit('name_accepted', { name });
     io.emit('players', getPlayerList());
@@ -323,7 +338,6 @@ io.on('connection', (socket) => {
       roundNumber: round.number,
       playerId,
       playerName: player.name,
-      guess: code,
       isCorrect,
       correctDigits: correct,
       guessedAt: now,

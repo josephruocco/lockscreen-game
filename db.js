@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS guesses (
   round_number INTEGER NOT NULL,
   player_id TEXT NOT NULL,
   player_name TEXT,
-  guess TEXT NOT NULL,
   is_correct INTEGER NOT NULL DEFAULT 0,
   correct_digits INTEGER NOT NULL DEFAULT 0,
   guessed_at INTEGER NOT NULL,
@@ -79,8 +78,8 @@ const statements = {
     WHERE round_number = ?
   `),
   insertGuess: db.prepare(`
-    INSERT INTO guesses (round_id, round_number, player_id, player_name, guess, is_correct, correct_digits, guessed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO guesses (round_id, round_number, player_id, player_name, is_correct, correct_digits, guessed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `),
   insertLockout: db.prepare(`
     INSERT INTO lockouts (round_id, round_number, player_id, player_name, attempt_count_trigger, started_at, ended_at, duration_seconds)
@@ -104,10 +103,10 @@ function getRoundId(roundNumber) {
   return statements.getRoundByNumber.get(roundNumber)?.id;
 }
 
-function recordGuess({ roundNumber, playerId, playerName, guess, isCorrect, correctDigits, guessedAt, totalGuesses }) {
+function recordGuess({ roundNumber, playerId, playerName, isCorrect, correctDigits, guessedAt, totalGuesses }) {
   const roundId = getRoundId(roundNumber);
   if (!roundId) return;
-  statements.insertGuess.run(roundId, roundNumber, playerId, playerName || null, guess, isCorrect ? 1 : 0, correctDigits || 0, guessedAt);
+  statements.insertGuess.run(roundId, roundNumber, playerId, playerName || null, isCorrect ? 1 : 0, correctDigits || 0, guessedAt);
   statements.updateRoundGuessCount.run(totalGuesses, roundNumber);
 }
 
