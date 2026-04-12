@@ -552,6 +552,127 @@
     background: #1c1c1e;
     color: #fff;
   }
+
+  /* Leaderboard panel */
+  .lb-toggle-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.55);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0 2px;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .lb-toggle-btn:hover { color: rgba(255,255,255,0.85); }
+
+  .lb-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 22;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 14px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lb-overlay.hidden { display: none; }
+
+  .lb-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: #0a84ff;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: inherit;
+    z-index: 2;
+  }
+
+  .lb-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 18px;
+    margin-top: 4px;
+  }
+
+  .lb-section {
+    width: 100%;
+    max-width: 340px;
+    margin-bottom: 20px;
+  }
+
+  .lb-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 4px;
+  }
+
+  .lb-rank {
+    width: 22px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.3);
+    flex-shrink: 0;
+  }
+
+  .lb-rank.gold { color: #ffd60a; }
+  .lb-rank.silver { color: #a8b1d1; }
+  .lb-rank.bronze { color: #cd7f32; }
+
+  .lb-name {
+    flex: 1;
+    font-size: 14px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lb-stat {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .lb-stat.highlight { color: #30d158; font-weight: 600; }
+  .lb-stat.danger { color: #ff453a; font-weight: 600; }
+  .lb-stat.warn { color: #ff9f0a; font-weight: 600; }
+
+  .lb-empty {
+    font-size: 13px;
+    color: rgba(255,255,255,0.3);
+    padding: 8px 10px;
+  }
 </style>
 </head>
 <body>
@@ -566,6 +687,7 @@
     <div class="stat"><span class="stat-value" id="statLocked">0</span> <span data-i18n="lockedOut">locked out</span></div>
     <div class="stat"><span class="stat-value" id="statGuesses">0</span> <span data-i18n="guesses">guesses</span></div>
     <button class="players-toggle-btn" onclick="togglePlayers()">👥</button>
+    <button class="lb-toggle-btn" onclick="toggleLeaderboard()">🏆</button>
   </div>
 
   <!-- Players panel -->
@@ -629,6 +751,24 @@
 
   <!-- Confetti -->
   <div class="confetti-container hidden" id="confettiContainer"></div>
+
+  <!-- Leaderboard overlay -->
+  <div class="lb-overlay hidden" id="lbOverlay">
+    <button class="lb-close" onclick="toggleLeaderboard()">Done</button>
+    <div class="lb-title">Leaderboard</div>
+    <div class="lb-section">
+      <div class="lb-section-title">Recent Winners</div>
+      <div id="lbRecent"></div>
+    </div>
+    <div class="lb-section">
+      <div class="lb-section-title">Most Passwords Cracked</div>
+      <div id="lbCrackers"></div>
+    </div>
+    <div class="lb-section">
+      <div class="lb-section-title">Most Time Locked Out</div>
+      <div id="lbLockouts"></div>
+    </div>
+  </div>
 
   <!-- Name entry overlay -->
   <div class="name-overlay" id="nameOverlay">
@@ -1255,6 +1395,84 @@ socket.on('new_round', (data) => {
   updateAttemptInfo();
   if (data.players) renderPlayers(data.players);
 });
+
+// ── Leaderboard ──────────────────────────────────────────────────────────────
+
+let lbOpen = false;
+
+function toggleLeaderboard() {
+  lbOpen = !lbOpen;
+  document.getElementById('lbOverlay').classList.toggle('hidden', !lbOpen);
+  if (lbOpen) fetchLeaderboard();
+}
+
+function fmtLbSeconds(s) {
+  s = Math.floor(Number(s) || 0);
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h + 'h ' + m + 'm';
+  }
+  if (s >= 60) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  return s + 's';
+}
+
+function rankClass(i) {
+  if (i === 0) return 'gold';
+  if (i === 1) return 'silver';
+  if (i === 2) return 'bronze';
+  return '';
+}
+
+async function fetchLeaderboard() {
+  try {
+    const res = await fetch('/api/leaderboard', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    renderLbRecent(data.recentWinners || []);
+    renderLbCrackers(data.topCrackers || []);
+    renderLbLockouts(data.topLockouts || []);
+  } catch {}
+}
+
+function renderLbRecent(list) {
+  const el = document.getElementById('lbRecent');
+  if (!list.length) { el.innerHTML = '<div class="lb-empty">No winners yet</div>'; return; }
+  el.innerHTML = list.map(r =>
+    `<div class="lb-row">
+      <span class="lb-rank">#${r.round}</span>
+      <span class="lb-name">${escapeHtml(r.name)}</span>
+      <span class="lb-stat highlight">${r.guesses} guesses</span>
+      ${r.seconds ? `<span class="lb-stat">${fmtLbSeconds(r.seconds)}</span>` : ''}
+    </div>`
+  ).join('');
+}
+
+function renderLbCrackers(list) {
+  const el = document.getElementById('lbCrackers');
+  if (!list.length) { el.innerHTML = '<div class="lb-empty">No cracks yet</div>'; return; }
+  el.innerHTML = list.map((r, i) =>
+    `<div class="lb-row">
+      <span class="lb-rank ${rankClass(i)}">${i + 1}</span>
+      <span class="lb-name">${escapeHtml(r.name)}</span>
+      <span class="lb-stat highlight">${r.cracked} cracked</span>
+      <span class="lb-stat">${r.guesses} guesses</span>
+    </div>`
+  ).join('');
+}
+
+function renderLbLockouts(list) {
+  const el = document.getElementById('lbLockouts');
+  if (!list.length) { el.innerHTML = '<div class="lb-empty">No lockouts yet</div>'; return; }
+  el.innerHTML = list.map((r, i) =>
+    `<div class="lb-row">
+      <span class="lb-rank ${rankClass(i)}">${i + 1}</span>
+      <span class="lb-name">${escapeHtml(r.name)}</span>
+      <span class="lb-stat danger">${fmtLbSeconds(r.totalSeconds)}</span>
+      <span class="lb-stat">${r.count}x</span>
+    </div>`
+  ).join('');
+}
 </script>
 </body>
 </html>

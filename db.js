@@ -233,6 +233,21 @@ function getLeaderboardLockouts(limit = 50) {
   `, [limit]);
 }
 
+function getRecentWinners(limit = 10) {
+  return all(`
+    SELECT
+      COALESCE(p.name, 'Unknown') AS name,
+      r.round_number AS round,
+      r.total_guesses AS guesses,
+      CASE WHEN r.ended_at IS NOT NULL THEN ROUND((r.ended_at - r.started_at) / 1000.0, 1) ELSE NULL END AS seconds
+    FROM rounds r
+    LEFT JOIN players p ON p.id = r.winner_player_id
+    WHERE r.winner_player_id IS NOT NULL
+    ORDER BY r.round_number DESC
+    LIMIT ?
+  `, [limit]);
+}
+
 function getRecentRounds(limit = 25) {
   return all(`
     SELECT
@@ -300,6 +315,7 @@ module.exports = {
   getLeaderboardWinners,
   getLeaderboardCrackers,
   getLeaderboardLockouts,
+  getRecentWinners,
   getRecentRounds,
   getPlayerStats,
 };

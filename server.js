@@ -245,6 +245,23 @@ app.get('/api/stats/recent-rounds', requireAdmin, (req, res) => {
   res.json(db.getRecentRounds(limit));
 });
 
+// ── Public Leaderboard API ───────────────────────────────────────────────────
+
+app.get('/api/leaderboard', (_req, res) => {
+  const recentWinners = db.getRecentWinners(10);
+  const topCrackers = db.getLeaderboardCrackers(5).map(r => ({
+    name: r.playerName,
+    cracked: r.passwordsCracked,
+    guesses: r.totalGuesses,
+  }));
+  const topLockouts = db.getLeaderboardLockouts(5).map(r => ({
+    name: r.playerName,
+    totalSeconds: r.totalLockoutSeconds,
+    count: r.lockoutCount,
+  }));
+  res.json({ recentWinners, topCrackers, topLockouts });
+});
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 
 io.on('connection', (socket) => {
