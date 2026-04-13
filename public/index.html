@@ -320,9 +320,16 @@
   .attempt-info .warn { color: #ff9f0a; font-weight: 500; }
 
   /* Round banner */
-  .round-banner {
+  .round-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     position: relative;
     z-index: 3;
+    margin-top: 6px;
+  }
+
+  .round-banner {
     background: rgba(255,255,255,0.08);
     padding: 4px 14px;
     border-radius: 12px;
@@ -330,7 +337,17 @@
     font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.5px;
-    margin-top: 6px;
+  }
+
+  .round-timer {
+    background: rgba(255,255,255,0.08);
+    padding: 4px 10px;
+    border-radius: 12px;
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
   }
 
   /* Disabled overlay */
@@ -701,7 +718,10 @@
     <div class="date" id="dateDisplay">Monday, April 7</div>
   </div>
 
-  <div class="round-banner" id="roundBanner">ROUND 1</div>
+  <div class="round-row">
+    <div class="round-banner" id="roundBanner">ROUND 1</div>
+    <div class="round-timer" id="roundTimer">0:00</div>
+  </div>
 
   <!-- Lock Content -->
   <div class="lock-content">
@@ -1100,6 +1120,7 @@ let myName = null;
 let myWon = false;
 let playersPanelOpen = false;
 let lastCorrect = null;
+let roundStartedAt = Date.now();
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 
@@ -1190,11 +1211,18 @@ function updateStats(stats) {
   document.getElementById('statOnline').textContent = stats.online.toLocaleString();
   document.getElementById('statLocked').textContent = stats.lockedOut.toLocaleString();
   document.getElementById('statGuesses').textContent = stats.totalGuesses.toLocaleString();
-  document.getElementById('roundBanner').textContent = t('enterPasscode').includes('Passcode')
-    ? 'ROUND ' + stats.roundNumber
-    : t('players') + ' \u2014 ' + stats.roundNumber;
   document.getElementById('roundBanner').textContent = 'ROUND ' + stats.roundNumber;
+  if (stats.roundStartedAt) roundStartedAt = stats.roundStartedAt;
 }
+
+function updateRoundTimer() {
+  const elapsed = Math.max(0, Math.floor((Date.now() - roundStartedAt) / 1000));
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('roundTimer').textContent = m + ':' + String(s).padStart(2, '0');
+}
+setInterval(updateRoundTimer, 1000);
+updateRoundTimer();
 
 function updateAttemptInfo() {
   const el = document.getElementById('attemptInfo');
