@@ -103,6 +103,11 @@ function all(sql, params = []) {
   return rows;
 }
 
+function getLastRoundNumber() {
+  const row = get(`SELECT MAX(round_number) AS maxRound FROM rounds`);
+  return (row && row.maxRound) || 0;
+}
+
 function initRound(round) {
   try {
     run(`INSERT OR IGNORE INTO rounds (round_number, password, started_at, total_guesses) VALUES (?, ?, ?, 0)`,
@@ -315,6 +320,7 @@ module.exports = {
   getLeaderboardWinners,
   getLeaderboardCrackers,
   getLeaderboardLockouts,
+  getLastRoundNumber,
   getRecentWinners,
   getRecentRounds,
   getPlayerStats,

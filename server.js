@@ -416,6 +416,11 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 
 db.init().then(() => {
+  const lastRound = db.getLastRoundNumber();
+  if (lastRound > 0) {
+    round.number = lastRound + 1;
+    console.log(`Resuming from round ${round.number} (last completed: ${lastRound})`);
+  }
   db.initRound(round);
   server.listen(PORT, () => {
     console.log(`Lockscreen Game running on http://localhost:${PORT}`);
