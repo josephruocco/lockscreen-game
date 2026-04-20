@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Lockscreen Game</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #000;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px 80px;
+  }
+
+  main {
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 36px;
+  }
+
+  .logo {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    text-decoration: none;
+  }
+
+  .logo:hover { color: rgba(255,255,255,0.7); }
+
+  .back-link {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    text-decoration: none;
+  }
+
+  .back-link:hover { color: #fff; }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+
+  .updated {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 32px;
+  }
+
+  .lede {
+    font-size: 17px;
+    line-height: 1.55;
+    color: rgba(255,255,255,0.82);
+    margin-bottom: 28px;
+  }
+
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin-top: 36px;
+    margin-bottom: 12px;
+    color: #fff;
+  }
+
+  p, li {
+    font-size: 15px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.75);
+  }
+
+  p { margin-bottom: 14px; }
+
+  ul { padding-left: 22px; margin-bottom: 14px; }
+  li { margin-bottom: 6px; }
+
+  strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  code {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 13.5px;
+    background: rgba(255,255,255,0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #fff;
+  }
+
+  a {
+    color: #64b5ff;
+    text-decoration: none;
+  }
+
+  a:hover { text-decoration: underline; }
+
+  .short {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 32px;
+    background: rgba(255,255,255,0.03);
+  }
+
+  .short h2 {
+    margin-top: 0;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+  }
+
+  .short ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+  }
+
+  footer a { color: rgba(255,255,255,0.6); }
+</style>
+</head>
+<body>
+<main>
+  <div class="top-bar">
+    <a href="/" class="logo">Lockscreen Game</a>
+    <a href="/" class="back-link">← Back to game</a>
+  </div>
+
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: April 20, 2026</p>
+
+  <p class="lede">
+    Lockscreen Game is a small multiplayer browser game. It's free, there are no ads, and we don't want your data. This page is short on purpose.
+  </p>
+
+  <div class="short">
+    <h2>The short version</h2>
+    <ul>
+      <li>No account. No email. No sign-up.</li>
+      <li>No advertising, no advertising trackers, no third-party analytics.</li>
+      <li>We don't sell, share, or rent any data about you. There's nothing to sell.</li>
+      <li>The only things we store are what we need to run a game of guessing 4-digit codes: a display name you choose, a random browser ID, your guesses, and how long you've been locked out.</li>
+    </ul>
+  </div>
+
+  <h2>What is stored in your browser</h2>
+  <p>When you open the game, your browser saves two things in its own local storage:</p>
+  <ul>
+    <li><strong><code>playerId</code></strong> — a random ID (a UUID) generated in your browser the first time you visit. It lets the server remember you across refreshes and enforce lockout timers. It is not linked to your real identity and we never try to link it to one.</li>
+    <li><strong><code>playerName</code></strong> — the display name you typed in, so we can show it back to you on reload.</li>
+  </ul>
+  <p>Both live on your device. Clear your browser storage for this site and they're gone. There's no fingerprinting, no ad ID, no cross-site tracking, no cookies used for tracking.</p>
+
+  <h2>What is stored on the server</h2>
+  <p>To run the game we keep a small SQLite database with:</p>
+  <ul>
+    <li>Your <code>playerId</code> and the display name you chose.</li>
+    <li>The guesses you submit (the four-digit code, whether it was correct, how many digits matched, and when).</li>
+    <li>Lockout records (when a lockout started and ended, and how many failed attempts triggered it).</li>
+    <li>Round metadata (round number, passcode, start/end time, winner).</li>
+    <li>First-seen and last-seen timestamps for your <code>playerId</code>.</li>
+  </ul>
+  <p>We don't store your IP address, email, phone number, location, device fingerprint, or anything tied to your real-world identity, because we never ask for any of that.</p>
+  <p>Our hosting provider keeps standard server access logs for operational reasons (uptime, abuse, security). We do not use those logs for analytics or advertising.</p>
+
+  <h2>Display-name moderation</h2>
+  <p>
+    If the operator has configured an OpenAI API key, the display name you submit is sent to OpenAI's moderation endpoint to check whether it's a slur or hate speech. Only the name itself is sent — not your guesses, not your <code>playerId</code>. If no key is configured, this step is skipped entirely. OpenAI's use of data is governed by their own <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">privacy policy</a>.
+  </p>
+
+  <h2>What we don't do</h2>
+  <ul>
+    <li>No ads.</li>
+    <li>No advertising trackers, no Google Analytics, no Facebook Pixel, no Segment, Mixpanel, or similar.</li>
+    <li>No selling or sharing of player data with any third party.</li>
+    <li>No marketing emails — we don't have your email.</li>
+    <li>No training of AI models on your gameplay.</li>
+  </ul>
+
+  <h2>Leaderboards and public visibility</h2>
+  <p>
+    Your chosen display name, your aggregate stats (rounds won, guesses, total lockout time), and recent round results appear on public leaderboards inside the game. Don't use your real name as your display name if that bothers you — use a nickname. You can change it by clearing site data and picking a new one.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    The game doesn't knowingly collect any information from children under 13 beyond the display name and gameplay data described above. If you're a parent or guardian and want us to delete a specific <code>playerId</code>'s data, contact us (see below) and we'll remove it.
+  </p>
+
+  <h2>Data deletion</h2>
+  <p>Because there's no account, the simplest way to wipe your data on your end is:</p>
+  <ul>
+    <li>Clear the site's local storage in your browser. That deletes your <code>playerId</code> and <code>playerName</code> from your device.</li>
+    <li>If you also want your historical records (guesses, lockouts, leaderboard entries) removed from the server database, email us the old <code>playerId</code> and we'll delete it.</li>
+  </ul>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    If we ever change what we collect, we'll update this page and the "Last updated" date at the top. If a change is significant (for example, introducing any form of tracking or third-party sharing), we'll put a visible notice on the game itself.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    Questions or deletion requests: <a href="mailto:ruoccoj19@gmail.com">ruoccoj19@gmail.com</a>
+  </p>
+
+  <footer>
+    <a href="/">← Back to Lockscreen Game</a>
+  </footer>
+</main>
+</body>
+</html>

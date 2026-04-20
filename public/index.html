@@ -547,6 +547,16 @@
   .name-submit:hover { background: rgba(255,255,255,0.24); }
   .name-submit:active { background: rgba(255,255,255,0.34); transform: scale(0.97); }
 
+  .name-overlay-privacy {
+    margin-top: 22px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+  }
+
+  .name-overlay-privacy:hover { color: rgba(255,255,255,0.7); }
+
   /* Language selector */
   .lang-select {
     position: absolute;
@@ -820,6 +830,7 @@
     >
     <div class="name-error" id="nameError"></div>
     <button class="name-submit" id="nameSubmit" onclick="submitName()" data-i18n="joinBtn">Join</button>
+    <a class="name-overlay-privacy" href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>
   </div>
 
   <div class="copyright">© <a href="https://josephruocco.net" target="_blank" rel="noopener">Joseph Ruocco</a>. All rights reserved.</div>
