@@ -168,7 +168,7 @@ function getStats() {
   };
 }
 
-function startNewRound() {
+async function startNewRound() {
   round = {
     number: round.number + 1,
     password: generatePassword(),
@@ -176,7 +176,7 @@ function startNewRound() {
     winner: null,
     totalGuesses: 0,
   };
-  db.initRound(round);
+  await db.initRound(round);
   for (const [, p] of players) {
     p.attempts = 0;
     p.disabledUntil = null;
@@ -216,45 +216,49 @@ app.get('/admin.html', requireAdmin, (_req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-app.get('/api/stats/overview', requireAdmin, (_req, res) => {
-  res.json({ live: getStats(), historical: db.getOverview() });
+app.get('/api/stats/overview', requireAdmin, async (_req, res) => {
+  res.json({ live: getStats(), historical: await db.getOverview() });
 });
 
-app.get('/api/stats/leaderboard/winners', requireAdmin, (req, res) => {
+app.get('/api/stats/leaderboard/winners', requireAdmin, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
-  res.json(db.getLeaderboardWinners(limit));
+  res.json(await db.getLeaderboardWinners(limit));
 });
 
-app.get('/api/stats/leaderboard/crackers', requireAdmin, (req, res) => {
+app.get('/api/stats/leaderboard/crackers', requireAdmin, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
-  res.json(db.getLeaderboardCrackers(limit));
+  res.json(await db.getLeaderboardCrackers(limit));
 });
 
-app.get('/api/stats/leaderboard/lockouts', requireAdmin, (req, res) => {
+app.get('/api/stats/leaderboard/lockouts', requireAdmin, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
-  res.json(db.getLeaderboardLockouts(limit));
+  res.json(await db.getLeaderboardLockouts(limit));
 });
 
-app.get('/api/stats/players', requireAdmin, (req, res) => {
+app.get('/api/stats/players', requireAdmin, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
-  res.json(db.getPlayerStats(limit));
+  res.json(await db.getPlayerStats(limit));
 });
 
-app.get('/api/stats/recent-rounds', requireAdmin, (req, res) => {
+app.get('/api/stats/recent-rounds', requireAdmin, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 25, 200);
-  res.json(db.getRecentRounds(limit));
+  res.json(await db.getRecentRounds(limit));
 });
 
 // ── Public Leaderboard API ───────────────────────────────────────────────────
 
-app.get('/api/leaderboard', (_req, res) => {
-  const recentWinners = db.getRecentWinners(10);
-  const topCrackers = db.getLeaderboardCrackers(5).map(r => ({
+app.get('/api/leaderboard', async (_req, res) => {
+  const [recentWinners, crackers, lockouts] = await Promise.all([
+    db.getRecentWinners(10),
+    db.getLeaderboardCrackers(5),
+    db.getLeaderboardLockouts(5),
+  ]);
+  const topCrackers = crackers.map(r => ({
     name: r.playerName,
     cracked: r.passwordsCracked,
     guesses: r.totalGuesses,
   }));
-  const topLockouts = db.getLeaderboardLockouts(5).map(r => ({
+  const topLockouts = lockouts.map(r => ({
     name: r.playerName,
     totalSeconds: r.totalLockoutSeconds,
     count: r.lockoutCount,
@@ -280,7 +284,7 @@ io.on('connection', (socket) => {
     player = getPlayerState(playerId);
     player.socketId = socket.id;
     socketToPlayer.set(socket.id, playerId);
-    db.touchPlayer(playerId, player.name);
+    db.touchPlayer(playerId, player.name).catch(() => {});
 
     socket.emit('init', {
       stats: getStats(),
@@ -311,12 +315,12 @@ io.on('connection', (socket) => {
       return;
     }
     player.name = name;
-    db.setPlayerName(playerId, name);
+    await db.setPlayerName(playerId, name);
     socket.emit('name_accepted', { name });
     io.emit('players', getPlayerList());
   });
 
-  socket.on('guess', (code) => {
+  socket.on('guess', async (code) => {
     if (!player) return;
     if (typeof code !== 'string' || !/^\d{4}$/.test(code)) return;
     if (round.winner) return;
@@ -349,7 +353,7 @@ io.on('connection', (socket) => {
 
     const isCorrect = code === round.password;
 
-    db.recordGuess({
+    await db.recordGuess({
       roundNumber: round.number,
       playerId,
       playerName: player.name,
@@ -361,7 +365,7 @@ io.on('connection', (socket) => {
 
     if (isCorrect) {
       round.winner = playerId;
-      db.finishRound({
+      await db.finishRound({
         roundNumber: round.number,
         winnerPlayerId: playerId,
         endedAt: now,
@@ -376,15 +380,15 @@ io.on('connection', (socket) => {
         stats: getStats(),
       });
 
-      setTimeout(() => {
-        startNewRound();
+      setTimeout(async () => {
+        await startNewRound();
         broadcastNewRound();
       }, 8000);
     } else {
       const disableSeconds = getDisableSeconds(player.attempts);
       if (disableSeconds > 0) {
         player.disabledUntil = now + disableSeconds * 1000;
-        db.recordLockout({
+        await db.recordLockout({
           roundNumber: round.number,
           playerId,
           playerName: player.name,
@@ -415,13 +419,13 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 
-db.init().then(() => {
-  const lastRound = db.getLastRoundNumber();
+db.init().then(async () => {
+  const lastRound = await db.getLastRoundNumber();
   if (lastRound > 0) {
     round.number = lastRound + 1;
     console.log(`Resuming from round ${round.number} (last completed: ${lastRound})`);
   }
-  db.initRound(round);
+  await db.initRound(round);
   server.listen(PORT, () => {
     console.log(`Lockscreen Game running on http://localhost:${PORT}`);
     console.log(`Round ${round.number} — password: ${round.password}`);

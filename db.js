@@ -1,21 +1,26 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 
-const DB_PATH = path.join(__dirname, 'data.sqlite');
+const client = createClient({
+  url: process.env.TURSO_URL || 'file:local.sqlite',
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-let db;
+async function run(sql, args = []) {
+  await client.execute({ sql, args });
+}
+
+async function get(sql, args = []) {
+  const res = await client.execute({ sql, args });
+  return res.rows[0] || null;
+}
+
+async function all(sql, args = []) {
+  const res = await client.execute({ sql, args });
+  return res.rows;
+}
 
 async function init() {
-  const SQL = await initSqlJs();
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    db = new SQL.Database();
-  }
-
-  db.run(`
+  await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS players (
       id TEXT PRIMARY KEY,
       name TEXT,
@@ -57,109 +62,82 @@ async function init() {
       duration_seconds INTEGER NOT NULL,
       FOREIGN KEY(round_id) REFERENCES rounds(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_guesses_round_id ON guesses(round_id);
+    CREATE INDEX IF NOT EXISTS idx_guesses_player_id ON guesses(player_id);
+    CREATE INDEX IF NOT EXISTS idx_lockouts_player_id ON lockouts(player_id);
+    CREATE INDEX IF NOT EXISTS idx_rounds_winner_player_id ON rounds(winner_player_id);
   `);
-
-  try { db.run(`CREATE INDEX IF NOT EXISTS idx_guesses_round_id ON guesses(round_id)`); } catch {}
-  try { db.run(`CREATE INDEX IF NOT EXISTS idx_guesses_player_id ON guesses(player_id)`); } catch {}
-  try { db.run(`CREATE INDEX IF NOT EXISTS idx_lockouts_player_id ON lockouts(player_id)`); } catch {}
-  try { db.run(`CREATE INDEX IF NOT EXISTS idx_rounds_winner_player_id ON rounds(winner_player_id)`); } catch {}
-
-  save();
 }
 
-function save() {
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
-}
-
-// Auto-save every 30 seconds
-setInterval(() => { if (db) save(); }, 30000);
-
-function run(sql, params = []) {
-  db.run(sql, params);
-  save();
-}
-
-function get(sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return row;
-  }
-  stmt.free();
-  return null;
-}
-
-function all(sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
-function getLastRoundNumber() {
-  const row = get(`SELECT MAX(round_number) AS maxRound FROM rounds`);
+async function getLastRoundNumber() {
+  const row = await get(`SELECT MAX(round_number) AS maxRound FROM rounds`);
   return (row && row.maxRound) || 0;
 }
 
-function initRound(round) {
+async function initRound(round) {
   try {
-    run(`INSERT OR IGNORE INTO rounds (round_number, password, started_at, total_guesses) VALUES (?, ?, ?, 0)`,
-      [round.number, round.password, round.startedAt]);
+    await run(
+      `INSERT OR IGNORE INTO rounds (round_number, password, started_at, total_guesses) VALUES (?, ?, ?, 0)`,
+      [round.number, round.password, round.startedAt]
+    );
   } catch {}
 }
 
-function touchPlayer(id, name = null) {
+async function touchPlayer(id, name = null) {
   const now = Date.now();
-  const existing = get(`SELECT id FROM players WHERE id = ?`, [id]);
+  const existing = await get(`SELECT id FROM players WHERE id = ?`, [id]);
   if (existing) {
     if (name) {
-      run(`UPDATE players SET name = ?, last_seen_at = ? WHERE id = ?`, [name, now, id]);
+      await run(`UPDATE players SET name = ?, last_seen_at = ? WHERE id = ?`, [name, now, id]);
     } else {
-      run(`UPDATE players SET last_seen_at = ? WHERE id = ?`, [now, id]);
+      await run(`UPDATE players SET last_seen_at = ? WHERE id = ?`, [now, id]);
     }
   } else {
-    run(`INSERT INTO players (id, name, created_at, last_seen_at) VALUES (?, ?, ?, ?)`, [id, name, now, now]);
+    await run(
+      `INSERT INTO players (id, name, created_at, last_seen_at) VALUES (?, ?, ?, ?)`,
+      [id, name, now, now]
+    );
   }
 }
 
-function setPlayerName(id, name) {
-  run(`UPDATE players SET name = ?, last_seen_at = ? WHERE id = ?`, [name, Date.now(), id]);
+async function setPlayerName(id, name) {
+  await run(`UPDATE players SET name = ?, last_seen_at = ? WHERE id = ?`, [name, Date.now(), id]);
 }
 
-function getRoundId(roundNumber) {
-  const row = get(`SELECT id FROM rounds WHERE round_number = ?`, [roundNumber]);
+async function getRoundId(roundNumber) {
+  const row = await get(`SELECT id FROM rounds WHERE round_number = ?`, [roundNumber]);
   return row?.id;
 }
 
-function recordGuess({ roundNumber, playerId, playerName, isCorrect, correctDigits, guessedAt, totalGuesses }) {
-  const roundId = getRoundId(roundNumber);
+async function recordGuess({ roundNumber, playerId, playerName, isCorrect, correctDigits, guessedAt, totalGuesses }) {
+  const roundId = await getRoundId(roundNumber);
   if (!roundId) return;
-  run(`INSERT INTO guesses (round_id, round_number, player_id, player_name, is_correct, correct_digits, guessed_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [roundId, roundNumber, playerId, playerName || null, isCorrect ? 1 : 0, correctDigits || 0, guessedAt]);
-  run(`UPDATE rounds SET total_guesses = ? WHERE round_number = ?`, [totalGuesses, roundNumber]);
+  await run(
+    `INSERT INTO guesses (round_id, round_number, player_id, player_name, is_correct, correct_digits, guessed_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [roundId, roundNumber, playerId, playerName || null, isCorrect ? 1 : 0, correctDigits || 0, guessedAt]
+  );
+  await run(`UPDATE rounds SET total_guesses = ? WHERE round_number = ?`, [totalGuesses, roundNumber]);
 }
 
-function recordLockout({ roundNumber, playerId, playerName, attemptCountTrigger, startedAt, endedAt, durationSeconds }) {
-  const roundId = getRoundId(roundNumber);
+async function recordLockout({ roundNumber, playerId, playerName, attemptCountTrigger, startedAt, endedAt, durationSeconds }) {
+  const roundId = await getRoundId(roundNumber);
   if (!roundId) return;
-  run(`INSERT INTO lockouts (round_id, round_number, player_id, player_name, attempt_count_trigger, started_at, ended_at, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [roundId, roundNumber, playerId, playerName || null, attemptCountTrigger, startedAt, endedAt, durationSeconds]);
+  await run(
+    `INSERT INTO lockouts (round_id, round_number, player_id, player_name, attempt_count_trigger, started_at, ended_at, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [roundId, roundNumber, playerId, playerName || null, attemptCountTrigger, startedAt, endedAt, durationSeconds]
+  );
 }
 
-function finishRound({ roundNumber, winnerPlayerId, endedAt, totalGuesses }) {
-  run(`UPDATE rounds SET ended_at = ?, winner_player_id = ?, total_guesses = ? WHERE round_number = ?`,
-    [endedAt, winnerPlayerId, totalGuesses, roundNumber]);
+async function finishRound({ roundNumber, winnerPlayerId, endedAt, totalGuesses }) {
+  await run(
+    `UPDATE rounds SET ended_at = ?, winner_player_id = ?, total_guesses = ? WHERE round_number = ?`,
+    [endedAt, winnerPlayerId, totalGuesses, roundNumber]
+  );
 }
 
-function getOverview() {
-  const totals = get(`
+async function getOverview() {
+  const totals = await get(`
     SELECT
       (SELECT COUNT(*) FROM players) AS totalPlayers,
       (SELECT COUNT(*) FROM rounds) AS totalRounds,
@@ -170,7 +148,7 @@ function getOverview() {
       (SELECT ROUND(AVG(CASE WHEN ended_at IS NOT NULL THEN (ended_at - started_at) / 1000.0 END), 1) FROM rounds) AS avgRoundSeconds
   `) || {};
 
-  const recentWinners = all(`
+  const recentWinners = await all(`
     SELECT r.round_number, r.total_guesses, r.started_at, r.ended_at, COALESCE(p.name, 'Unknown') AS winner_name
     FROM rounds r
     LEFT JOIN players p ON p.id = r.winner_player_id
@@ -182,7 +160,7 @@ function getOverview() {
   return { ...totals, recentWinners };
 }
 
-function getLeaderboardWinners(limit = 50) {
+async function getLeaderboardWinners(limit = 50) {
   return all(`
     SELECT
       p.id AS playerId,
@@ -200,7 +178,7 @@ function getLeaderboardWinners(limit = 50) {
   `, [limit]);
 }
 
-function getLeaderboardCrackers(limit = 50) {
+async function getLeaderboardCrackers(limit = 50) {
   return all(`
     SELECT
       g.player_id AS playerId,
@@ -220,7 +198,7 @@ function getLeaderboardCrackers(limit = 50) {
   `, [limit]);
 }
 
-function getLeaderboardLockouts(limit = 50) {
+async function getLeaderboardLockouts(limit = 50) {
   return all(`
     SELECT
       l.player_id AS playerId,
@@ -238,7 +216,7 @@ function getLeaderboardLockouts(limit = 50) {
   `, [limit]);
 }
 
-function getRecentWinners(limit = 10) {
+async function getRecentWinners(limit = 10) {
   return all(`
     SELECT
       COALESCE(p.name, 'Unknown') AS name,
@@ -253,7 +231,7 @@ function getRecentWinners(limit = 10) {
   `, [limit]);
 }
 
-function getRecentRounds(limit = 25) {
+async function getRecentRounds(limit = 25) {
   return all(`
     SELECT
       r.round_number AS roundNumber,
@@ -269,7 +247,7 @@ function getRecentRounds(limit = 25) {
   `, [limit]);
 }
 
-function getPlayerStats(limit = 100) {
+async function getPlayerStats(limit = 100) {
   return all(`
     SELECT
       p.id AS playerId,
@@ -283,25 +261,19 @@ function getPlayerStats(limit = 100) {
       COALESCE(l.longestLockoutSeconds, 0) AS longestLockoutSeconds
     FROM players p
     LEFT JOIN (
-      SELECT player_id, COUNT(*) AS totalGuesses
-      FROM guesses
-      GROUP BY player_id
+      SELECT player_id, COUNT(*) AS totalGuesses FROM guesses GROUP BY player_id
     ) g ON g.player_id = p.id
     LEFT JOIN (
       SELECT winner_player_id AS player_id, COUNT(*) AS roundsWon
-      FROM rounds
-      WHERE winner_player_id IS NOT NULL
-      GROUP BY winner_player_id
+      FROM rounds WHERE winner_player_id IS NOT NULL GROUP BY winner_player_id
     ) w ON w.player_id = p.id
     LEFT JOIN (
       SELECT player_id, SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS passwordsCracked
-      FROM guesses
-      GROUP BY player_id
+      FROM guesses GROUP BY player_id
     ) c ON c.player_id = p.id
     LEFT JOIN (
       SELECT player_id, COUNT(*) AS lockoutCount, SUM(duration_seconds) AS totalLockoutSeconds, MAX(duration_seconds) AS longestLockoutSeconds
-      FROM lockouts
-      GROUP BY player_id
+      FROM lockouts GROUP BY player_id
     ) l ON l.player_id = p.id
     ORDER BY roundsWon DESC, passwordsCracked DESC, totalGuesses DESC
     LIMIT ?

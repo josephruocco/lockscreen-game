@@ -10,6 +10,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.2",
     "express": "^4.18.2",
     "socket.io": "^4.7.4",
     "sql.js": "^1.14.1"
