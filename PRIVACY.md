@@ -69,4 +69,4 @@ If we ever change what we collect, we'll update this page and the "Last updated"
 
 ## Contact
 
-Questions or deletion requests: **ruoccoj19@gmail.com**
+Questions or deletion requests: [josephruocco.net/contact](https://josephruocco.net/contact)
