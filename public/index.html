@@ -835,10 +835,19 @@ const tabId = Date.now() + '-' + Math.random();
 tabChannel.postMessage({ type: 'new_tab', id: tabId });
 tabChannel.onmessage = (e) => {
   if (e.data.type === 'new_tab' && e.data.id !== tabId) {
+    // Another tab opened — tell it we exist, and focus ourselves
     tabChannel.postMessage({ type: 'already_open', id: tabId });
+    window.focus();
   }
   if (e.data.type === 'already_open' && e.data.id !== tabId) {
-    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:system-ui;font-size:20px;text-align:center;padding:20px;">Game is already open in another tab. Please close this one.</div>';
+    // We're the duplicate — show a friendly switch screen
+    document.body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:20px;gap:20px;">
+        <div style="font-size:48px;">🔒</div>
+        <div style="font-size:22px;font-weight:300;">Game already open</div>
+        <div style="font-size:15px;color:rgba(255,255,255,0.5);max-width:260px;">You already have the game running in another tab.</div>
+        <button onclick="window.close()" style="margin-top:8px;padding:12px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;color:#fff;font-size:16px;cursor:pointer;font-family:inherit;">Close This Tab</button>
+      </div>`;
   }
 };
 
