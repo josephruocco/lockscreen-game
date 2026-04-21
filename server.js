@@ -11,6 +11,10 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/privacy', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
+});
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
