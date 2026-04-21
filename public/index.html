@@ -832,21 +832,45 @@
 // ── Prevent multiple tabs ────────────────────────────────────────────────────
 const tabChannel = new BroadcastChannel('lockscreen_game');
 const tabId = Date.now() + '-' + Math.random();
-tabChannel.postMessage({ type: 'new_tab', id: tabId });
+
+// If we're taking over, skip the duplicate check entirely
+const isTakeover = sessionStorage.getItem('takeover') === '1';
+if (isTakeover) {
+  sessionStorage.removeItem('takeover');
+} else {
+  tabChannel.postMessage({ type: 'new_tab', id: tabId });
+}
+
 tabChannel.onmessage = (e) => {
   if (e.data.type === 'new_tab' && e.data.id !== tabId) {
-    // Another tab opened — tell it we exist, and focus ourselves
+    // Another tab opened — tell it we exist, focus ourselves
     tabChannel.postMessage({ type: 'already_open', id: tabId });
     window.focus();
   }
   if (e.data.type === 'already_open' && e.data.id !== tabId) {
-    // We're the duplicate — show a friendly switch screen
+    // We're the duplicate — offer to take over
     document.body.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:20px;gap:20px;">
-        <div style="font-size:48px;">🔒</div>
-        <div style="font-size:22px;font-weight:300;">Game already open</div>
-        <div style="font-size:15px;color:rgba(255,255,255,0.5);max-width:260px;">You already have the game running in another tab.</div>
-        <button onclick="window.close()" style="margin-top:8px;padding:12px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;color:#fff;font-size:16px;cursor:pointer;font-family:inherit;">Close This Tab</button>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:20px;gap:16px;">
+        <div style="font-size:52px;">🔒</div>
+        <div style="font-size:24px;font-weight:300;">Game already open</div>
+        <div style="font-size:15px;color:rgba(255,255,255,0.45);max-width:260px;line-height:1.5;">You have the game running in another tab.</div>
+        <button id="playHereBtn" style="margin-top:12px;padding:14px 40px;background:#0a84ff;border:none;border-radius:14px;color:#fff;font-size:17px;font-weight:500;cursor:pointer;font-family:inherit;">Play Here</button>
+        <button onclick="window.close()" style="padding:10px 28px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:rgba(255,255,255,0.6);font-size:15px;cursor:pointer;font-family:inherit;">Close This Tab</button>
+      </div>`;
+    document.getElementById('playHereBtn').onclick = () => {
+      tabChannel.postMessage({ type: 'take_over', id: tabId });
+      sessionStorage.setItem('takeover', '1');
+      location.reload();
+    };
+  }
+  if (e.data.type === 'take_over' && e.data.id !== tabId) {
+    // Another tab is taking over — block ourselves
+    document.body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:20px;gap:16px;">
+        <div style="font-size:52px;">📱</div>
+        <div style="font-size:24px;font-weight:300;">Game moved</div>
+        <div style="font-size:15px;color:rgba(255,255,255,0.45);max-width:260px;line-height:1.5;">You're now playing in another tab.</div>
+        <button onclick="sessionStorage.setItem('takeover','1');location.reload()" style="margin-top:12px;padding:14px 40px;background:#0a84ff;border:none;border-radius:14px;color:#fff;font-size:17px;font-weight:500;cursor:pointer;font-family:inherit;">Play Here Instead</button>
       </div>`;
   }
 };
